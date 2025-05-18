@@ -1,11 +1,19 @@
 package container
 
 import (
+	"log"
 	"os"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 func LoadConfig() *Config {
+
+	if err := godotenv.Load(); err != nil {
+		log.Println("Arquivo .env não encontrado, usando variáveis de ambiente existentes")
+	}
+
 	config := &Config{}
 
 	config.Server.Port = getEnv("SERVER_PORT", "8080")
