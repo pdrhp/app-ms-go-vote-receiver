@@ -1,0 +1,49 @@
+package handlers
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pdrhp/ms-voto-receiver-go/internal/core/usecase"
+)
+
+type VoteRequest struct {
+    ParticipanteID int    `json:"participanteId" binding:"required"`
+    SessionID      string `json:"sessionId" binding:"required"`
+}
+
+type VoteHandler struct {
+	receiveVoteUseCase *usecase.ReceiveVoteUseCase
+}
+
+func NewVoteHandler(receiveVoteUseCase *usecase.ReceiveVoteUseCase) *VoteHandler {
+	return &VoteHandler{
+		receiveVoteUseCase: receiveVoteUseCase,
+	}
+}
+
+func (h *VoteHandler) Handle(c *gin.Context) {
+	var request usecase.ReceiveVoteInput
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Payload inválido",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	output, err := h.receiveVoteUseCase.Execute(c.Request.Context(), request)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "Falha ao processar voto",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":   "Voto recebido com sucesso",
+		"voteId":    output.VoteID,
+		"timestamp": output.Timestamp,
+	})
+}
