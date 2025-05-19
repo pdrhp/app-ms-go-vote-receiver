@@ -1,6 +1,8 @@
 package container
 
 import (
+	"log"
+
 	"github.com/pdrhp/ms-voto-receiver-go/internal/core/port"
 	"github.com/pdrhp/ms-voto-receiver-go/internal/core/usecase"
 	"github.com/pdrhp/ms-voto-receiver-go/internal/infrastructure/kafka"
@@ -15,6 +17,7 @@ type Container struct {
 func NewContainer(config *Config) (*Container, error) {
 	c := &Container{}
 
+	log.Println("Inicializando adaptador Kafka...")
 	publisher, err := kafka.NewVotePublisherAdapter(
 		config.Kafka.Brokers,
 		config.Kafka.Topic,
@@ -24,6 +27,7 @@ func NewContainer(config *Config) (*Container, error) {
 	}
 	c.VoteRepository = publisher
 
+	log.Println("Inicializando caso de uso ReceiveVoteUseCase...")
 	c.ReceiveVoteUseCase = usecase.NewReceiveVoteUseCase(c.VoteRepository)
 
 	return c, nil

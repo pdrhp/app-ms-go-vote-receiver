@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/pdrhp/ms-voto-receiver-go/internal/core/entity"
@@ -39,13 +40,17 @@ func (uc *ReceiveVoteUseCase) Execute(ctx context.Context, input ReceiveVoteInpu
 		return nil, fmt.Errorf("session ID não pode ser vazio")
 	}
 
+	log.Printf("Criando voto: participanteId=%d, sessionId=%s", input.ParticipantID, input.SessionID)
+
 	vote := entity.NewVote(input.ParticipantID, input.SessionID)
 
 	publishCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancel()
 
+	log.Println("Publicando voto no port.VotePublisher")
 	err := uc.voteRepo.PublishVote(publishCtx, vote)
 	if err != nil {
+		log.Printf("Falha ao publicar voto: %v", err)
 		vote.MarkAsFailed()
 		return nil, fmt.Errorf("falha ao publicar voto: %w", err)
 	}

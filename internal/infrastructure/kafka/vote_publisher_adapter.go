@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/pdrhp/ms-voto-receiver-go/internal/core/entity"
@@ -54,10 +55,18 @@ func (a *VotePublisherAdapter) PublishVote(ctx context.Context, vote *entity.Vot
 		return err
 	}
 
-	return a.writer.WriteMessages(ctx, kafka.Message{
+	log.Printf("Enviando mensagem para Kafka: %v", message)
+
+	if err := a.writer.WriteMessages(ctx, kafka.Message{
 		Key:   []byte(vote.SessionID),
 		Value: value,
-	})
+	}); err != nil {
+		log.Printf("Erro ao publicar mensagem no Kafka: %v", err)
+		return err
+	}
+
+	log.Println("Mensagem publicada com sucesso no Kafka")
+	return nil
 }
 
 func (a *VotePublisherAdapter) HealthCheck(ctx context.Context) error {

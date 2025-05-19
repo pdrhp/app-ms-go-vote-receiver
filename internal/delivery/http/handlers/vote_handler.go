@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,8 @@ func (h *VoteHandler) Handle(c *gin.Context) {
 		})
 		return
 	}
+
+	log.Printf("Recebida requisição de voto: participanteId=%d, sessionId=%s", request.ParticipantID, request.SessionID)
 
 	output, err := h.receiveVoteUseCase.Execute(c.Request.Context(), request)
 	if err != nil {
