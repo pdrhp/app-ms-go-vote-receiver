@@ -13,10 +13,16 @@ import (
 )
 
 type VotePublisherAdapter struct {
-	writer *kafka.Writer
+	writer  *kafka.Writer
+	brokers []string
+	topic   string
 }
 
 func NewVotePublisherAdapter(brokers []string, topic string) (port.VotePublisher, error) {
+	if len(brokers) == 0 {
+		return nil, fmt.Errorf("pelo menos um broker deve ser configurado")
+	}
+
 	writer := &kafka.Writer{
 		Addr:         kafka.TCP(brokers...),
 		Topic:        topic,
@@ -28,17 +34,21 @@ func NewVotePublisherAdapter(brokers []string, topic string) (port.VotePublisher
 	}
 
 	adapter := &VotePublisherAdapter{
-		writer: writer,
+		writer:  writer,
+		brokers: brokers,
+		topic:   topic,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-    if err := adapter.HealthCheck(ctx); err != nil {
-        writer.Close()
-        return nil, fmt.Errorf("health check Kafka falhou: %w", err)
-    }
+	log.Printf("Iniciando health check para %d broker(s): %v", len(brokers), brokers)
+	if err := adapter.HealthCheck(ctx); err != nil {
+		writer.Close()
+		return nil, fmt.Errorf("health check Kafka falhou: %w", err)
+	}
 
+	log.Printf("Health check concluído com sucesso para todos os brokers")
 	return adapter, nil
 }
 
@@ -70,24 +80,46 @@ func (a *VotePublisherAdapter) PublishVote(ctx context.Context, vote *entity.Vot
 }
 
 func (a *VotePublisherAdapter) HealthCheck(ctx context.Context) error {
-    conn, err := kafka.DialLeader(ctx, "tcp", a.writer.Addr.String(), a.writer.Topic, 0)
-    if err != nil {
-        return fmt.Errorf("falha ao conectar ao Kafka: %w", err)
-    }
-    defer conn.Close()
+	var lastErr error
+	successfulBrokers := 0
 
-    conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+  for i, broker := range a.brokers {
+		log.Printf("Testando conexão com broker %d/%d: %s", i+1, len(a.brokers), broker)
 
-    brokers, err := conn.Brokers()
-    if err != nil {
-        return fmt.Errorf("falha ao acessar brokers Kafka: %w", err)
-    }
+		brokerCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 
-    if len(brokers) == 0 {
-        return fmt.Errorf("nenhum broker Kafka disponível")
-    }
+		conn, err := kafka.DialContext(brokerCtx, "tcp", broker)
+		if err != nil {
+			log.Printf("❌ Falha ao conectar com broker %s: %v", broker, err)
+			lastErr = err
+			cancel()
+			continue
+		}
 
-    return nil
+		_, err = conn.ReadPartitions(a.topic)
+		conn.Close()
+		cancel()
+
+		if err != nil {
+			log.Printf("❌ Falha ao acessar tópico '%s' no broker %s: %v", a.topic, broker, err)
+			lastErr = err
+			continue
+		}
+
+		log.Printf("✅ Broker %s está funcionando corretamente", broker)
+		successfulBrokers++
+	}
+
+	if successfulBrokers == 0 {
+		return fmt.Errorf("nenhum broker está acessível. Último erro: %w", lastErr)
+	}
+
+	if successfulBrokers < len(a.brokers) {
+		log.Printf("⚠️  Aviso: %d de %d brokers estão funcionando", successfulBrokers, len(a.brokers))
+	}
+
+	log.Printf("Health check concluído: %d/%d brokers funcionando", successfulBrokers, len(a.brokers))
+	return nil
 }
 
 
