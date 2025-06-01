@@ -44,13 +44,9 @@ func (uc *ReceiveVoteUseCase) Execute(ctx context.Context, input ReceiveVoteInpu
 
 	vote := entity.NewVote(input.ParticipantID, input.SessionID)
 
-	publishCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-	defer cancel()
+	err := uc.voteRepo.PublishVote(context.Background(), vote)
 
-	log.Println("Publicando voto no port.VotePublisher")
-	err := uc.voteRepo.PublishVote(publishCtx, vote)
 	if err != nil {
-		log.Printf("Falha ao publicar voto: %v", err)
 		vote.MarkAsFailed()
 		return nil, fmt.Errorf("falha ao publicar voto: %w", err)
 	}

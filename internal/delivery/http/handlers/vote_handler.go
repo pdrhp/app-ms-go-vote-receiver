@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pdrhp/ms-voto-receiver-go/internal/core/usecase"
@@ -24,6 +25,8 @@ func NewVoteHandler(receiveVoteUseCase *usecase.ReceiveVoteUseCase) *VoteHandler
 }
 
 func (h *VoteHandler) Handle(c *gin.Context) {
+	start := time.Now()
+
 	var request usecase.ReceiveVoteInput
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -36,7 +39,11 @@ func (h *VoteHandler) Handle(c *gin.Context) {
 	log.Printf("Recebida requisição de voto: participanteId=%d, sessionId=%s", request.ParticipantID, request.SessionID)
 
 	output, err := h.receiveVoteUseCase.Execute(c.Request.Context(), request)
+
+	duration := time.Since(start)
+
 	if err != nil {
+		log.Printf("Erro após %v: %v", duration, err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error":   "Falha ao processar voto",
 			"details": err.Error(),

@@ -18,6 +18,7 @@ func NewContainer(config *Config) (*Container, error) {
 	c := &Container{}
 
 	log.Println("Inicializando adaptador Kafka...")
+
 	publisher, err := kafka.NewVotePublisherAdapter(
 		config.Kafka.Brokers,
 		config.Kafka.Topic,
@@ -25,12 +26,23 @@ func NewContainer(config *Config) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	c.VoteRepository = publisher
 
 	log.Println("Inicializando caso de uso ReceiveVoteUseCase...")
 	c.ReceiveVoteUseCase = usecase.NewReceiveVoteUseCase(c.VoteRepository)
 
 	return c, nil
+}
+
+func (c *Container) Close() error {
+	log.Println("Fechando recursos do container...")
+
+	if closer, ok := c.VoteRepository.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+
+	return nil
 }
 
 type Config struct {

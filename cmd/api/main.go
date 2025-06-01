@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/pdrhp/ms-voto-receiver-go/internal/container"
@@ -13,12 +15,23 @@ import (
 
 func main() {
 
+	runtime.GOMAXPROCS(runtime.NumCPU())
+  debug.SetGCPercent(100)
+
+	log.Printf("Configurado para usar %d CPUs", runtime.NumCPU())
+
 	config := container.LoadConfig()
 
 	c, err := container.NewContainer(config)
 	if err != nil {
 		log.Fatalf("Erro ao criar container: %v", err)
 	}
+
+	defer func() {
+		if err := c.Close(); err != nil {
+			log.Printf("Erro ao fechar container: %v", err)
+		}
+	}()
 
 	router := http.SetupRouter(c.ReceiveVoteUseCase)
 
